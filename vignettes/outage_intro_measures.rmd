@@ -16,13 +16,13 @@ library(tidyverse)
 library(sf)
 ```
 
-```{r, include = FALSE} 
+```{r, include = FALSE, eval = FALSE} 
 NC_fips <- "37"
 NC_counties <- counties(state = NC_fips, cb = TRUE)
 NC_tracts <- tracts(state = NC_fips, cb = TRUE)
 ```
 
-```{r, include = FALSE}
+```{r, include = FALSE, eval = FALSE}
 # get dates
 matthew_hurdat2  <- get_hurdat2(
   storm_id = "MATTHEW-2016",
@@ -43,7 +43,7 @@ matthew_outage_sf <- NC_counties |>
   left_join(matthew_outage, by = c("GEOID" = "geoid"))
 ```
 
-```{r, include = FALSE}
+```{r, include = FALSE, eval = FALSE}
 # get dates
 florence_hurdat2  <- get_hurdat2(
   storm_id = "FLORENCE-2018",
@@ -70,7 +70,7 @@ florence_outage_sf <- NC_counties |>
 **Maximum Outage Percentage**: Maximum percentage of customers with no power by county over the course of the storm to 5 days after  
 **Average Outage Duration**: Average customer's total duration (days) with no power by county over the course of the storm to 5 days after
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 
 bind_cols(
   Florence = florence_outage$max_pct_out,
@@ -89,7 +89,7 @@ bind_cols(
   kableExtra::kable_styling(full_width = FALSE, position = "left")
 ```
 
-```{r, echo = FALSE}
+```{r, echo = FALSE, eval = FALSE}
 table <- bind_cols(florence_outage, storm = "Florence") |>
   bind_rows(
     bind_cols(matthew_outage, storm = "Matthew")
@@ -110,7 +110,7 @@ cowplot::plot_grid(outage_pct_boxplot, outage_dur_boxplot)
 
 ## Correlation
 ### Matthew
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 matthew_prcp <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Matthew16/prcp_tr10.csv")
 matthew_close <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Matthew16/closest_dis_tr10.csv")
 matthew_wind <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Matthew16/windmodel_tr10.csv")
@@ -151,7 +151,7 @@ cowplot::plot_grid(matthew_net, matthew_corr)
 ```
 
 ### Florence
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 florence_prcp <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Florence18/prcp_tr10.csv")
 florence_close <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Florence18/closest_dis_tr10.csv")
 florence_wind <- read_csv("https://raw.githubusercontent.com/ryanzomorrodi/hurricaneexposuredata/master/output/Florence18/windmodel_tr10.csv")
@@ -192,7 +192,7 @@ cowplot::plot_grid(florence_net, florence_corr)
 ## Maps
 
 ### Florence 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 ggplot() +
   geom_sf(data = florence_outage_sf, aes(fill = max_pct_out)) +
   scale_fill_distiller(palette = "Blues", direction = 1) +
@@ -219,7 +219,7 @@ ggplot() +
   )
 ```
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 ggplot() +
   geom_sf(data = florence_outage_sf, aes(fill = avg_customer_hrs_out / 24)) +
   scale_fill_distiller(palette = "Greens", direction = 1) +
@@ -247,7 +247,7 @@ ggplot() +
 ```
 
 ### Matthew
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 ggplot() +
   geom_sf(data = matthew_outage_sf, aes(fill = max_pct_out)) +
   scale_fill_distiller(palette = "Blues", direction = 1) +
@@ -274,7 +274,7 @@ ggplot() +
   )
 ```
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10}
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 10, eval = FALSE}
 ggplot() +
   geom_sf(data = matthew_outage_sf, aes(fill = avg_customer_hrs_out / 24)) +
   scale_fill_distiller(palette = "Greens", direction = 1) +

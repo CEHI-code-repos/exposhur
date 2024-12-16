@@ -59,7 +59,7 @@ cat(start_time, "\n")
 
     -   `tract/{storm_id}/distance_wind.csv`
 
-        | Col1 | Col2 |
+        | Column | Description |
         |------------------------------------|------------------------------------|
         | geoid | Geographic identifier |
         | closest_datetime | Date and time in UTC that storm is closest to the imputed storm track |

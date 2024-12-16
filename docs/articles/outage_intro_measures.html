@@ -43,6 +43,9 @@
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
     <a class="dropdown-item" href="../articles/harvey_analysis.html">Harvey Analysis</a>
     <a class="dropdown-item" href="../articles/outage_intro_measures.html">Matthew Florence Outage EDA</a>
+    <a class="dropdown-item" href="../articles/top_15_outage.html">Large Hurricane Analysis - Outage</a>
+    <a class="dropdown-item" href="../articles/top_15_precipitation.html">Large Hurricane Analysis - Precipitation</a>
+    <a class="dropdown-item" href="../articles/top_15_wind.html">Large Hurricane Analysis - Distance and Wind</a>
   </div>
 </li>
       </ul>
@@ -59,7 +62,7 @@
 
 
 
-<script src="outage_intro_measures_files/kePrint-0.0.1/kePrint.js"></script><link href="outage_intro_measures_files/lightable-0.0.1/lightable.css" rel="stylesheet">
+
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="" class="logo" alt=""><h1>Matthew Florence Outage EDA</h1>
@@ -81,161 +84,6 @@ customers with no power by county over the course of the storm to 5 days
 after<br><strong>Average Outage Duration</strong>: Average customer’s total
 duration (days) with no power by county over the course of the storm to
 5 days after</p>
-<table class="table table" style="width: auto !important; float: left; margin-right: 10px;">
-<caption>
-Maximum Outage Percentage
-</caption>
-<thead><tr>
-<th style="text-align:left;">
-</th>
-<th style="text-align:left;">
-Florence
-</th>
-<th style="text-align:left;">
-Matthew
-</th>
-</tr></thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Min. :0.00000
-</td>
-<td style="text-align:left;">
-Min. :0.00000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-1st Qu.:0.02348
-</td>
-<td style="text-align:left;">
-1st Qu.:0.02477
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Median :0.06181
-</td>
-<td style="text-align:left;">
-Median :0.07900
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Mean :0.21477
-</td>
-<td style="text-align:left;">
-Mean :0.22531
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-3rd Qu.:0.31383
-</td>
-<td style="text-align:left;">
-3rd Qu.:0.38730
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Max. :1.00000
-</td>
-<td style="text-align:left;">
-Max. :1.00000
-</td>
-</tr>
-</tbody>
-</table>
-<table class="table table" style="width: auto !important; ">
-<caption>
-Average Outage Duration
-</caption>
-<thead><tr>
-<th style="text-align:left;">
-</th>
-<th style="text-align:left;">
-Florence
-</th>
-<th style="text-align:left;">
-Matthew
-</th>
-</tr></thead>
-<tbody>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Min. : 0.0000
-</td>
-<td style="text-align:left;">
-Min. : 0.00000
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-1st Qu.: 0.1202
-</td>
-<td style="text-align:left;">
-1st Qu.: 0.08567
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Median : 0.2775
-</td>
-<td style="text-align:left;">
-Median : 0.75240
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Mean : 8.8750
-</td>
-<td style="text-align:left;">
-Mean : 5.70365
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-3rd Qu.: 6.9986
-</td>
-<td style="text-align:left;">
-3rd Qu.: 8.74389
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-</td>
-<td style="text-align:left;">
-Max. :85.4107
-</td>
-<td style="text-align:left;">
-Max. :42.01953
-</td>
-</tr>
-</tbody>
-</table>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-6-1.png" width="700"></p>
 </div>
 <div class="section level2">
 <h2 id="correlation">Correlation<a class="anchor" aria-label="anchor" href="#correlation"></a>
@@ -243,12 +91,10 @@ Max. :42.01953
 <div class="section level3">
 <h3 id="matthew">Matthew<a class="anchor" aria-label="anchor" href="#matthew"></a>
 </h3>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-7-1.png" width="960"></p>
 </div>
 <div class="section level3">
 <h3 id="florence">Florence<a class="anchor" aria-label="anchor" href="#florence"></a>
 </h3>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-8-1.png" width="960"></p>
 </div>
 </div>
 <div class="section level2">
@@ -257,14 +103,10 @@ Max. :42.01953
 <div class="section level3">
 <h3 id="florence-1">Florence<a class="anchor" aria-label="anchor" href="#florence-1"></a>
 </h3>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-9-1.png" width="960"></p>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-10-1.png" width="960"></p>
 </div>
 <div class="section level3">
 <h3 id="matthew-1">Matthew<a class="anchor" aria-label="anchor" href="#matthew-1"></a>
 </h3>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-11-1.png" width="960"></p>
-<p><img src="outage_intro_measures_files/figure-html/unnamed-chunk-12-1.png" width="960"></p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
