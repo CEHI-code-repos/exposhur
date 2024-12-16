@@ -43,7 +43,7 @@ download_nClimGrid <- function(dates, path) {
 #' @param path Path to download files into (if not provided,
 #' files will be download into the `tempdir()`)
 #'
-#' @return `stars` raster of climate data over the interval specified
+#' @return terra raster of climate data over the interval specified
 #' @export
 #'
 #' @examples
@@ -60,7 +60,8 @@ get_nClimGrid <- function(interval, path = NULL) {
 
   file_paths <- download_nClimGrid(dates, path)
 
-  purrr::map(file_paths, stars::read_ncdf) |>
-    do.call(what = c) |>
-    dplyr::filter(.data$time %within% interval)
+  combined_rasters <- purrr::map(file_paths, terra::rast) |>
+    do.call(what = c)
+  
+  combined_rasters[[terra::time(combined_rasters) %within% interval]]
 }

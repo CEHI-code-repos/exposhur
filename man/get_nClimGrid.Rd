@@ -13,7 +13,7 @@ get_nClimGrid(interval, path = NULL)
 files will be download into the \code{tempdir()})}
 }
 \value{
-\code{stars} raster of climate data over the interval specified
+terra raster of climate data over the interval specified
 }
 \description{
 Downloads NOAA \href{https://www.ncei.noaa.gov/products/land-based-station/nclimgrid-daily}{nClimGrid-Daily}

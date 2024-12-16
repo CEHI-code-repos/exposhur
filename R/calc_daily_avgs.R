@@ -21,36 +21,18 @@
 #' )
 #' }
 calc_daily_avgs <- function(nClimGrid, geography, geoid = "GEOID") {
-  cat("Transforming to WGS 1984...\n")
+  purrr::map(terra::time(nClimGrid), function(day) {
+    nClimGrid_day <- nClimGrid[[terra::time(nClimGrid) == day]]
 
-  geography <- sf::st_transform(geography, 4326)
-  nClimGrid <- stars::st_warp(nClimGrid, crs = 4326)
-
-  num_days <- stars::st_dimensions(nClimGrid) |>
-    purrr::pluck(3, "to")
-  start_date <- stars::st_dimensions(nClimGrid) |>
-    purrr::pluck(3, "offset")
-  end_date <- start_date + lubridate::days(num_days)
-  date_seq <- seq(start_date, end_date, by = "1 day")
-
-  purrr::map(
-    1:num_days,
-    function(day) {
-      cat(stringr::str_c(date_seq[day], "\n"))
-
-      day_rast <- nClimGrid |>
-        dplyr::slice("time", day) |>
-        terra::rast()
-
-      exactextractr::exact_extract(day_rast, geography, "mean") |>
-        tibble::tibble() |>
-        dplyr::mutate(
-          "date" = lubridate::as_date(date_seq[day]),
-          "geoid" = purrr::pluck(geography, geoid)
-        )
-    }
-  ) |>
+  zonal::execute_zonal(nClimGrid_day, geography, ID = geoid, fun = "mean", join = FALSE) |>
+    dplyr::mutate(
+      "date" = lubridate::as_date(day)
+    ) |>
+    dplyr::rename_with(
+      .fn = \(x) str_remove(x, "_.*$"),
+      .cols = starts_with("mean")
+    )
+  }) |>
     dplyr::bind_rows() |>
-    dplyr:: relocate(c("geoid", "date"), .before = dplyr::everything())
-
+    dplyr::relocate(date, mean_prcp = mean.prcp, .after = dplyr::everything())
 }

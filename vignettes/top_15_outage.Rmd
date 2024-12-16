@@ -1,0 +1,175 @@
+---
+title: "Large Hurricane Analysis - Outage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{top_15}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+Start Time
+
+```{r}
+start_time <- Sys.time()
+cat(start_time, "\n")
+```
+
+## Program Background
+
+-   Script name: Large Hurricane Analysis - Outage
+
+-   Project name: ADRD and Hurricane Exposure
+
+-   Program description:
+
+    Outage measure calculation for 15 previously selected large hurricanes. Only hurricanes in 2014 and after had available outage data.
+
+    Number of customers without electricity is collected by EAGLE-I. County-level electric customer estimates are generating by adding the census business survey and ACS5 population estimates for a county and normalizing to state-wide energy customer estimates from the Energy Information Administration.
+
+-   Data:
+
+    -   [EAGLE-I outage data](https://figshare.com/ndownloader/articles/24237376/versions/2)
+
+    -   [Census Business Survey](https://www2.census.gov/programs-surveys/susb/tables/)
+
+    -   ACS 5 - through `tidycensus` package
+
+    -   [EIA State Customer Estimates](https://www.eia.gov/electricity/data/browser/data/index.php?method=getMapData&geosetId=ELEC.CUSTOMERS.ALL.A&freq=A&topic=56)
+
+    -   HURDAT2 - to get storm dates
+
+-   Restrictions:
+
+-   Outline of program/analysis:
+
+    -   Specify all storms
+
+    -   Download and process hurdat2 tracks
+
+    -   Extract outage data for dates specified by the HURDAT2 plus 2 days after
+
+    -   Calculate outage estimates for the maximum percentage of customers without electricity and the average duration of outages
+
+-   Author: Ryan Zomorrodi
+
+-   Revisions
+
+-   Input files
+
+    -   All files are downloaded using R functions
+    -   Cache is stored in `raw-data\eaglei`
+
+-   Output files
+
+    -   `tract/{storm id}/outage.csv`
+
+        | Column | Description |
+        |------------------------------------|------------------------------------|
+        | `geoid` | Geographic identifier |
+        | `max_pct_out` | Maximum percentage of customers out of electricity at any point |
+        | `avg_customer_hrs_out` | Average number of hours each customer was out of electricity for |
+
+```{r setup}
+library(exposur)
+library(tidyverse)
+library(tigris)
+library(sf)
+```
+
+The following hurricanes were selected.
+
+```{r}
+# manually selected states of interest for each storm
+hur_info <- tribble(
+  ~ hurricane, ~ states,
+  "KATRINA-2005",  c("LA", "MS", "AL", "FL", "TN"),
+  "HARVEY-2017",   c("TX", "LA"),
+  "SANDY-2012",    c("NJ", "DE", "MD", "NY", "CT", "RI", "VA", "MA", "PA"),
+  "IRMA-2017",     c("FL", "GA", "SC", "AL"),
+  "IKE-2008",      c("TX", "LA"),
+  "IVAN-2004",     c("AL", "MS", "FL", "GA", "TN", "NC", "SC"),
+  "RITA-2005",     c("TX", "LA"),
+  "FLORENCE-2018", c("NC", "SC", "GA", "VA"),
+  "MICHAEL-2018",  c("FL", "GA", "AL"),
+  "WILMA-2005",    c("FL"),
+  "CHARLEY-2004",  c("FL", "GA", "SC", "NC"),
+  "IRENE-2011",    c("SC", "NC", "VA", "MD", "DE", "NJ", "PA", "NY", "CT"),
+  "FRANCES-2004",  c("FL", "GA", "SC", "NC", "AL", "TN", "VA"),
+  "ALLISON-2001",  c("TX", "LA", "MS", "AL", "FL"),
+  "MATTHEW-2016",  c("FL", "GA", "SC", "NC", "VA")
+)
+# get fips codes for each state
+fips_codes <- distinct(tigris::fips_codes, state, state_code)
+hur_info$fips <- pmap(hur_info, function(states, ...) {
+  fips_codes$state_code[match(states, fips_codes$state)]
+})
+```
+
+## Get hurdat2 info for each storm
+
+```{r}
+exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
+
+hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
+  hurdat  <- get_hurdat2(
+    storm_id = hurricane,
+    path = "raw-data/hurdat2"
+  )
+  
+  list(
+    start_date = min(hurdat$datetime),
+    end_date = max(hurdat$datetime),
+    hurdat = hurdat
+  )
+})
+hur_info <- unnest_wider(hur_info, hurdat2)
+```
+
+## Get outage data
+
+```{r}
+hur_info$eaglei <- pmap(hur_info, function(start_date, end_date, ...) {
+  if (year(start_date) < 2014) {
+    return(list(NULL))
+  }
+
+  get_eaglei(
+    interval = interval(start_date, end_date + days(2)),
+    path = "raw-data/eaglei"
+  )
+})
+```
+
+## Calculate outage
+
+```{r}
+hur_info$outage <- pmap(hur_info, function(eaglei, fips, start_date, ...) {
+  if (year(start_date) < 2014) {
+    return(list(NULL))
+  }
+
+  calc_outage(eaglei, fips)
+})
+
+pwalk(hur_info, function(outage, hurricane, start_date, ...) {
+  if (year(start_date) >= 2014) {
+    write_csv(outage, str_c("tract/", hurricane, "/outage.csv"))
+  }
+})
+```
+
+End Time
+
+```{r}
+end_time <- Sys.time()
+cat("End time: ", end_time, "\n")
+cat("Duration: ", start_time - end_time, "\n")
+```

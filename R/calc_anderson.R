@@ -83,8 +83,8 @@ calc_anderson_wind <- function(
     sf::st_transform(4326) |>
     sf::st_centroid() |>
     dplyr::mutate(
-      glon = purrr::map_dbl(sf::st_geometry(geography), 1),
-      glat = purrr::map_dbl(sf::st_geometry(geography), 2),
+      glon = purrr::map_dbl(.data$geometry, 1),
+      glat = purrr::map_dbl(.data$geometry, 2),
       glandsea = TRUE
     ) |>
     dplyr::select(

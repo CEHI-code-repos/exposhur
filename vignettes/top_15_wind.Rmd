@@ -1,0 +1,198 @@
+---
+title: "Large Hurricane Analysis - Distance and Wind"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{top_15}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+Start Time
+
+```{r}
+start_time <- Sys.time()
+cat(start_time, "\n")
+```
+
+## Program Background
+
+-   Script name: Large Hurricane Analysis - Distance and Wind
+
+-   Project name: ADRD and Hurricane Exposure
+
+-   Program description:
+
+    Maximum wind was calculated for each tract using the `stormwindmodel` published by Anderson at the geocentroid for each tract.
+
+-   Data:
+
+    -   HURDAT2
+
+-   Restrictions:
+
+-   Outline of program/analysis:
+
+    -   Specify all storms
+    -   Download and process hurdat2 tracks
+    -   Calculate geo-centroid for each tract
+    -   Utilize stormwindmodel to produce wind exposure estimates
+    -   Output imputed track geojsons for visualization
+
+-   Author: Ryan Zomorrodi
+
+-   Revisions
+
+-   Input files
+
+    -   All files are downloaded using R functions
+    -   Cache is stored in `raw-data\hurdat2`
+
+-   Output files
+
+    -   `tract/{storm_id}/distance_wind.csv`
+
+        | Col1 | Col2 |
+        |------------------------------------|------------------------------------|
+        | geoid | Geographic identifier |
+        | closest_datetime | Date and time in UTC that storm is closest to the imputed storm track |
+        | closest_dist | Closest distance (km) to imputed central track |
+        | highwind_datetime | Date and time in UTC of maximum wind speed |
+        | vmax_sust | Maximum 10-m 1-min sustained wind for the tropical cyclone (m/s) |
+        | vmax_gust | Max 10-m 1-min gust wind experienced at grid point (m/s) |
+        | sust_dur | Duration of time a certain sustained wind was experienced at grid point (minutes) |
+        | gust_dur | Duration of time a certain gust wind was experienced at grid point (minutes) |
+
+    -   `tract/{storm_id}/track_line.geojson`
+
+    -   `tract/{storm_id}/track_points.geojson`
+
+```{r setup}
+library(exposur)
+library(tidyverse)
+library(tigris)
+library(sf)
+```
+
+The following hurricanes were selected.
+
+```{r}
+# manually selected states of interest for each storm
+hur_info <- tribble(
+  ~ hurricane, ~ states,
+  "KATRINA-2005",  c("LA", "MS", "AL", "FL", "TN"),
+  "HARVEY-2017",   c("TX", "LA"),
+  "SANDY-2012",    c("NJ", "DE", "MD", "NY", "CT", "RI", "VA", "MA", "PA"),
+  "IRMA-2017",     c("FL", "GA", "SC", "AL"),
+  "IKE-2008",      c("TX", "LA"),
+  "IVAN-2004",     c("AL", "MS", "FL", "GA", "TN", "NC", "SC"),
+  "RITA-2005",     c("TX", "LA"),
+  "FLORENCE-2018", c("NC", "SC", "GA", "VA"),
+  "MICHAEL-2018",  c("FL", "GA", "AL"),
+  "WILMA-2005",    c("FL"),
+  "CHARLEY-2004",  c("FL", "GA", "SC", "NC"),
+  "IRENE-2011",    c("SC", "NC", "VA", "MD", "DE", "NJ", "PA", "NY", "CT"),
+  "FRANCES-2004",  c("FL", "GA", "SC", "NC", "AL", "TN", "VA"),
+  "ALLISON-2001",  c("TX", "LA", "MS", "AL", "FL"),
+  "MATTHEW-2016",  c("FL", "GA", "SC", "NC", "VA")
+)
+# get fips codes for each state
+fips_codes <- distinct(tigris::fips_codes, state, state_code)
+hur_info$fips <- pmap(hur_info, function(states, ...) {
+  fips_codes$state_code[match(states, fips_codes$state)]
+})
+```
+
+## Get hurdat2 info for each storm
+
+```{r}
+exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
+
+hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
+  hurdat  <- get_hurdat2(
+    storm_id = hurricane,
+    path = "raw-data/hurdat2"
+  )
+  
+  list(
+    start_date = min(hurdat$datetime),
+    end_date = max(hurdat$datetime),
+    hurdat = hurdat
+  )
+})
+hur_info <- unnest_wider(hur_info, hurdat2)
+```
+
+## Get states
+
+```{r, warning = FALSE}
+hur_info$states_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  states_list <- map(fips, 
+    ~ tracts(state = .x, year = 2010, cb = TRUE)
+  )
+  bind_rows(states_list) %>%
+    mutate(GEOID = str_sub(GEO_ID, -11)) %>% # get tract geoids
+    filter(!st_is_empty(.)) %>% # remove tracts with empty geographies
+    st_transform(4326) %>% # transform to WGS 84
+    st_centroid() # get geo-centroid of each tract
+})
+```
+
+## Calculate interpolated track
+
+```{r}
+hur_info$track <- pmap(hur_info, function(hurdat, ...) {
+  calc_interpolated_track(hurdat)
+})
+
+pwalk(hur_info, function(track, hurricane, ...) {
+  st_write(track, str_c("tract/", hurricane, "/track_points.geojson"))
+  
+  track %>%
+    st_combine() %>%
+    st_cast("LINESTRING") %>%
+    st_write(str_c("tract/", hurricane, "/track_line.geojson"))
+})
+```
+
+## Calculate closest distance
+
+```{r}
+hur_info$closest_dist <- pmap(hur_info, function(track, states_sf, ...) {
+  calc_closest_dist(track, states_sf)
+})
+```
+
+## Calculate wind speed
+
+```{r}
+hur_info$anderson_wind <- pmap(hur_info, function(hurdat, states_sf, ...) {
+  calc_anderson_wind(hurdat, states_sf)
+})
+```
+
+## Join output and write to file
+
+```{r}
+pwalk(hur_info, function(closest_dist, anderson_wind, hurricane, ...) {
+  full_join(closest_dist, anderson_wind, join_by(geoid)) %>%
+    relocate(closest_date, .before = closest_dist) %>%
+    rename(highwind_datetime = datetime, closest_datetime = closest_date) %>%
+    write_csv(str_c("tract/", hurricane, "/distance_wind.csv"))
+})
+```
+
+End Time
+
+```{r}
+end_time <- Sys.time()
+cat("End time: ", end_time, "\n")
+cat("Duration: ", start_time - end_time, "\n")
+```

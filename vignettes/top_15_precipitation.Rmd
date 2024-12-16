@@ -1,0 +1,178 @@
+---
+title: "Large Hurricane Analysis - Precipitation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{top_15}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+Start Time
+
+```{r}
+start_time <- Sys.time()
+cat(start_time, "\n")
+```
+
+## Program Background
+
+-   Script name: Large Hurricane Analysis - Precipitation
+
+-   Project name: ADRD and Hurricane Exposure
+
+-   Program description:
+
+    Amount of precipitation was calculated for every day specified within the HURDAT2 plus an additional 2 days after. nClimGrid raster data was used to calculate an areal mean precipitation for all tracts.
+
+-   Data:
+
+    -   HURDAT2 - to get storm dates
+    -   [nClimGrid-Daily](https://www.ncei.noaa.gov/products/land-based-station/nclimgrid-daily)
+
+-   Restrictions:
+
+-   Outline of program/analysis:
+
+    -   Specify all storms
+    -   Download and process hurdat2 tracks
+    -   Download nClimGrid data for duration of storm plus 2 days after
+    -   Calculate areal mean precipitation
+
+-   Author: Ryan Zomorrodi
+
+-   Revisions
+
+-   Input files
+
+    -   All files are downloaded using R functions
+    -   Cache is stored in `raw-data\nClimGrid`
+
+-   Output files
+
+    -   `tract/{storm id}/daily_prcp.csv`
+
+        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
+        | Col1                              | Col2                                                                                                      |
+        +===================================+===========================================================================================================+
+        | `geoid`                           | Geographic identifier                                                                                     |
+        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
+        | `date`                            | Date in UTC                                                                                               |
+        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
+        | `mean_prcp`                       | Mean areal precipitation (mm) for the specified `geoid` and `tract`                                       |
+        |                                   |                                                                                                           |
+        |                                   | Note: there may be NAs for a small number of coastline tract which were not entirely covered by nClimGrid |
+        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
+
+```{r setup}
+library(exposur)
+library(tidyverse)
+library(tigris)
+library(sf)
+```
+
+The following hurricanes were selected.
+
+```{r}
+# manually selected states of interest for each storm
+hur_info <- tribble(
+  ~ hurricane, ~ states,
+  "KATRINA-2005",  c("LA", "MS", "AL", "FL", "TN"),
+  "HARVEY-2017",   c("TX", "LA"),
+  "SANDY-2012",    c("NJ", "DE", "MD", "NY", "CT", "RI", "VA", "MA", "PA"),
+  "IRMA-2017",     c("FL", "GA", "SC", "AL"),
+  "IKE-2008",      c("TX", "LA"),
+  "IVAN-2004",     c("AL", "MS", "FL", "GA", "TN", "NC", "SC"),
+  "RITA-2005",     c("TX", "LA"),
+  "FLORENCE-2018", c("NC", "SC", "GA", "VA"),
+  "MICHAEL-2018",  c("FL", "GA", "AL"),
+  "WILMA-2005",    c("FL"),
+  "CHARLEY-2004",  c("FL", "GA", "SC", "NC"),
+  "IRENE-2011",    c("SC", "NC", "VA", "MD", "DE", "NJ", "PA", "NY", "CT"),
+  "FRANCES-2004",  c("FL", "GA", "SC", "NC", "AL", "TN", "VA"),
+  "ALLISON-2001",  c("TX", "LA", "MS", "AL", "FL"),
+  "MATTHEW-2016",  c("FL", "GA", "SC", "NC", "VA")
+)
+# get fips codes for each state
+fips_codes <- distinct(tigris::fips_codes, state, state_code)
+hur_info$fips <- pmap(hur_info, function(states, ...) {
+  fips_codes$state_code[match(states, fips_codes$state)]
+})
+```
+
+## Get hurdat2 info for each storm
+
+```{r}
+exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
+
+hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
+  hurdat  <- get_hurdat2(
+    storm_id = hurricane,
+    path = "raw-data/hurdat2"
+  )
+  
+  list(
+    start_date = min(hurdat$datetime),
+    end_date = max(hurdat$datetime),
+    hurdat = hurdat
+  )
+})
+hur_info <- unnest_wider(hur_info, hurdat2)
+```
+
+## Get states
+
+```{r, warning = FALSE}
+hur_info$states_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  states_list <- map(fips, 
+    ~ tracts(state = .x, year = 2010, cb = TRUE)
+  )
+  bind_rows(states_list) %>%
+    mutate(GEOID = str_sub(GEO_ID, -11)) %>% # get tract geoids
+    filter(!st_is_empty(.)) %>% # remove tracts with empty geographies
+    st_transform(4326) %>% # transform to WGS 84
+    rename(geoid = GEOID)
+})
+```
+
+## Get nClimGrid
+
+```{r}
+hur_info$nClimGrid <- pmap(hur_info, function(start_date, end_date, ...) {
+  get_nClimGrid(
+    interval = interval(start_date, end_date + days(2)),
+    path = "raw-data/nClimGrid"
+  )["prcp"]
+})
+```
+
+## Calculate daily precipitation
+
+```{r}
+hur_info$prcp_daily_avg <- pmap(hur_info, function(nClimGrid, states_sf, ...) {
+  calc_daily_avgs(
+    nClimGrid = nClimGrid,
+    geography = states_sf,
+    geoid = "geoid"
+  )
+})
+
+pwalk(hur_info, function(prcp_daily_avg, hurricane, ...) {
+  write_csv(prcp_daily_avg, str_c("tract/", hurricane, "/daily_prcp.csv"))
+})
+```
+
+End Time
+
+```{r}
+end_time <- Sys.time()
+cat("End time: ", end_time, "\n")
+cat("Duration: ", start_time - end_time, "\n")
+```

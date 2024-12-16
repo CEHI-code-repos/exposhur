@@ -1,19 +1,11 @@
 #' Calculate Closest Distance and Time
 #'
 #' @description
-#' Utilizes [`stormwindmodel`](https://github.com/geanders/stormwindmodel)
-#' to impute the `hurdat2` track to 15 minute intervals, calculate
-#' at what time point the storm is closest, and record the distance
+#' Calculates at what time point the storm is closest and records the distance
 #' from track at that time.
 #'
-#' @details
-#' ## Centroids
-#' By default this package will take the mean centroid of whatever
-#' geography provided to it. If you would like to approximate exposure
-#' at the population weighted centroid use `centr::mean_center()` on
-#' your geography before providing it to this function.
-#'
-#' @param hurdat2 Output from `get_hurdat2()`
+#' @param hurdat2 Output from `get_hurdat2()` or interpolated track from 
+#' `calc_interpolated_track()`
 #' @param geography `sf` object for the area of interest
 #' @param geoid Unique identifier for geography
 #'
@@ -27,27 +19,33 @@
 #'   TXLA_tracts
 #' )
 #' }
-calc_closest_dist <- function(hurdat2, geography, geoid = "GEOID") {
-  geography <- sf::st_centroid(geography) |>
-    sf::st_transform(4326)
-
-  interp_track <- calc_interpolated_track(hurdat2)
-
+calc_closest_dist <- function(track, geography, geoid = "GEOID") {
   geography |>
     dplyr::mutate(
-      "near_idx" = sf::st_nearest_feature(geography, interp_track),
-      "closest_date" = interp_track$datetime[.data$near_idx],
+      "near_idx" = sf::st_nearest_feature(geography, track),
+      "closest_date" = track$datetime[.data$near_idx],
       "closest_dist" = sf::st_distance(
-        interp_track$geometry[.data$near_idx],
+        track$geometry[.data$near_idx],
         geography,
         by_element = TRUE
-      )
+      ),
+      "closest_dist" = units::set_units(.data$closest_dist, "km")
     ) |>
     sf::st_drop_geometry() |>
     tibble::tibble() |>
     dplyr::select(c("geoid" = "GEOID", "closest_dist", "closest_date"))
 }
 
+#' Calculate Interpolated Track
+#'
+#' @description
+#' Utilizes [`stormwindmodel`](https://github.com/geanders/stormwindmodel)
+#' to impute the `hurdat2` track to 15 minute intervals.
+#'
+#' @param track Output from `get_hurdat2()`
+#'
+#' @return Interpolated track at 15 minute intervals
+#' @export
 calc_interpolated_track <- function(track) {
   track <- track |>
     dplyr::mutate(
@@ -55,23 +53,10 @@ calc_interpolated_track <- function(track) {
       lat = purrr::map_dbl(sf::st_geometry(track), 2)
     )
 
-  dif <- difftime(
-    track$datetime,
-    min(track$datetime),
-    units = "hour"
-  ) |>
-    as.integer()
-  seq_int <- seq(0, max(dif), 0.25)
-  seq_date <- seq(
-    min(track$datetime),
-    max(track$datetime),
-    "15 min"
-  )
-
-  tibble::tibble(
-    datetime = seq_date,
-    lon = stormwindmodel::interpolate_spline(dif, track$lon, seq_int),
-    lat = stormwindmodel::interpolate_spline(dif, track$lat, seq_int)
-  ) |>
-    sf::st_as_sf(coords = c("lon", "lat"), crs = 4326, na.fail = FALSE)
+  track |>
+    dplyr::rename(longitude = lon, latitude = lat, date = datetime) |>
+    dplyr::mutate(date = format(date, "%Y%m%d%H%M")) |>
+    stormwindmodel::create_full_track()  |>
+    sf::st_as_sf(coords = c("tclon", "tclat"), crs = 4326, na.fail = FALSE) |>
+    dplyr::rename(datetime = date)
 }
