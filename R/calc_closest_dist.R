@@ -33,7 +33,7 @@ calc_closest_dist <- function(track, geography, geoid = "GEOID") {
     ) |>
     sf::st_drop_geometry() |>
     tibble::tibble() |>
-    dplyr::select(c("geoid" = "GEOID", "closest_dist", "closest_date"))
+    dplyr::select(c("geoid" = geoid, "closest_dist", "closest_date"))
 }
 
 #' Calculate Interpolated Track

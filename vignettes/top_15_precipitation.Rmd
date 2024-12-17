@@ -15,13 +15,6 @@ knitr::opts_chunk$set(
 )
 ```
 
-Start Time
-
-```{r}
-start_time <- Sys.time()
-cat(start_time, "\n")
-```
-
 ## Program Background
 
 -   Script name: Large Hurricane Analysis - Precipitation
@@ -30,7 +23,7 @@ cat(start_time, "\n")
 
 -   Program description:
 
-    Amount of precipitation was calculated for every day specified within the HURDAT2 plus an additional 2 days after. nClimGrid raster data was used to calculate an areal mean precipitation for all tracts.
+    Amount of precipitation was calculated for every day specified within the HURDAT2 plus an additional 2 days after. nClimGrid raster data was used to calculate an areal mean precipitation for all tracts/zctas.
 
 -   Data:
 
@@ -59,17 +52,19 @@ cat(start_time, "\n")
 
     -   `tract/{storm id}/daily_prcp.csv`
 
-        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
-        | Column                            | Description                                                                                               |
-        +===================================+===========================================================================================================+
-        | `geoid`                           | Geographic identifier                                                                                     |
-        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
-        | `date`                            | Date in UTC                                                                                               |
-        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
-        | `mean_prcp`                       | Mean areal precipitation (mm) for the specified `geoid` and `tract`                                       |
-        |                                   |                                                                                                           |
-        |                                   | Note: there may be NAs for a small number of coastline tract which were not entirely covered by nClimGrid |
-        +-----------------------------------+-----------------------------------------------------------------------------------------------------------+
+    -   `zcta/{storm id}/daily_prcp.csv`
+
+        +-----------------+-----------------------------------------------------------------------------------------------------------+
+        | Column          | Description                                                                                               |
+        +=================+===========================================================================================================+
+        | `geoid`         | 2010 geographic identifier                                                                                |
+        +-----------------+-----------------------------------------------------------------------------------------------------------+
+        | `date`          | Date in UTC                                                                                               |
+        +-----------------+-----------------------------------------------------------------------------------------------------------+
+        | `mean_prcp`     | Mean areal precipitation (mm) for the specified `geoid` and `tract`                                       |
+        |                 |                                                                                                           |
+        |                 | Note: there may be NAs for a small number of coastline tract which were not entirely covered by nClimGrid |
+        +-----------------+-----------------------------------------------------------------------------------------------------------+
 
 ```{r setup}
 library(exposur)
@@ -130,15 +125,25 @@ hur_info <- unnest_wider(hur_info, hurdat2)
 ## Get states
 
 ```{r, warning = FALSE}
-hur_info$states_sf <- pmap(hur_info, function(start_date, fips, ...) {
-  states_list <- map(fips, 
+hur_info$tracts_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  tracts_list <- map(fips, 
     ~ tracts(state = .x, year = 2010, cb = TRUE)
   )
-  bind_rows(states_list) %>%
+  bind_rows(tracts_list) %>%
     mutate(GEOID = str_sub(GEO_ID, -11)) %>% # get tract geoids
     filter(!st_is_empty(.)) %>% # remove tracts with empty geographies
     st_transform(4326) %>% # transform to WGS 84
     rename(geoid = GEOID)
+})
+
+hur_info$zctas_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  zctas_list <- map(fips, 
+    ~ zctas(state = .x, year = 2010, cb = FALSE)
+  )
+  bind_rows(zctas_list) %>%
+    filter(!st_is_empty(.)) %>% # remove zctas with empty geographies
+    st_transform(4326) %>%
+    rename(geoid = GEOID10)
 })
 ```
 
@@ -156,16 +161,28 @@ hur_info$nClimGrid <- pmap(hur_info, function(start_date, end_date, ...) {
 ## Calculate daily precipitation
 
 ```{r}
-hur_info$prcp_daily_avg <- pmap(hur_info, function(nClimGrid, states_sf, ...) {
+hur_info$tract_prcp_daily_avg <- pmap(hur_info, function(nClimGrid, tracts_sf, ...) {
   calc_daily_avgs(
     nClimGrid = nClimGrid,
-    geography = states_sf,
+    geography = tracts_sf,
     geoid = "geoid"
   )
 })
 
-pwalk(hur_info, function(prcp_daily_avg, hurricane, ...) {
-  write_csv(prcp_daily_avg, str_c("tract/", hurricane, "/daily_prcp.csv"))
+pwalk(hur_info, function(tract_prcp_daily_avg, hurricane, ...) {
+  write_csv(tract_prcp_daily_avg, str_c("tract/", hurricane, "/daily_prcp.csv"))
+})
+
+hur_info$zcta_prcp_daily_avg <- pmap(hur_info, function(nClimGrid, zctas_sf, ...) {
+  calc_daily_avgs(
+    nClimGrid = nClimGrid,
+    geography = zctas_sf,
+    geoid = "geoid"
+  )
+})
+
+pwalk(hur_info, function(zcta_prcp_daily_avg, hurricane, ...) {
+  write_csv(zcta_prcp_daily_avg, str_c("zcta/", hurricane, "/daily_prcp.csv"))
 })
 ```
 

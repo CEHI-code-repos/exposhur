@@ -15,13 +15,6 @@ knitr::opts_chunk$set(
 )
 ```
 
-Start Time
-
-```{r}
-start_time <- Sys.time()
-cat(start_time, "\n")
-```
-
 ## Program Background
 
 -   Script name: Large Hurricane Analysis - Distance and Wind
@@ -30,7 +23,7 @@ cat(start_time, "\n")
 
 -   Program description:
 
-    Maximum wind was calculated for each tract using the `stormwindmodel` published by Anderson at the geocentroid for each tract.
+    Maximum wind was calculated for each tract using the `stormwindmodel` published by Anderson at the geocentroid for each tract/zcta.
 
 -   Data:
 
@@ -42,7 +35,7 @@ cat(start_time, "\n")
 
     -   Specify all storms
     -   Download and process hurdat2 tracks
-    -   Calculate geo-centroid for each tract
+    -   Calculate geo-centroid for each tract/zcta
     -   Utilize stormwindmodel to produce wind exposure estimates
     -   Output imputed track geojsons for visualization
 
@@ -59,9 +52,11 @@ cat(start_time, "\n")
 
     -   `tract/{storm_id}/distance_wind.csv`
 
+    -   `zcta/{storm_id}/distance_wind.csv`
+
         | Column | Description |
         |------------------------------------|------------------------------------|
-        | geoid | Geographic identifier |
+        | geoid | 2010 geographic identifier |
         | closest_datetime | Date and time in UTC that storm is closest to the imputed storm track |
         | closest_dist | Closest distance (km) to imputed central track |
         | highwind_datetime | Date and time in UTC of maximum wind speed |
@@ -72,7 +67,18 @@ cat(start_time, "\n")
 
     -   `tract/{storm_id}/track_line.geojson`
 
+    -   `zcta/{storm_id}/track_line.geojson`
+
     -   `tract/{storm_id}/track_points.geojson`
+
+    -   `zcta/{storm_id}/track_points.geojson`
+
+Start Time
+
+```{r}
+start_time <- Sys.time()
+cat(start_time, "\n")
+```
 
 ```{r setup}
 library(exposur)
@@ -133,15 +139,27 @@ hur_info <- unnest_wider(hur_info, hurdat2)
 ## Get states
 
 ```{r, warning = FALSE}
-hur_info$states_sf <- pmap(hur_info, function(start_date, fips, ...) {
-  states_list <- map(fips, 
+hur_info$tracts_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  tracts_list <- map(fips, 
     ~ tracts(state = .x, year = 2010, cb = TRUE)
   )
-  bind_rows(states_list) %>%
+  bind_rows(tracts_list) %>%
     mutate(GEOID = str_sub(GEO_ID, -11)) %>% # get tract geoids
     filter(!st_is_empty(.)) %>% # remove tracts with empty geographies
     st_transform(4326) %>% # transform to WGS 84
+    rename(geoid = GEOID) %>%
     st_centroid() # get geo-centroid of each tract
+})
+
+hur_info$zctas_sf <- pmap(hur_info, function(start_date, fips, ...) {
+  zctas_list <- map(fips, 
+    ~ zctas(state = .x, year = 2010, cb = FALSE)
+  )
+  bind_rows(zctas_list) %>%
+    filter(!st_is_empty(.)) %>% # remove zctas with empty geographies
+    st_transform(4326) %>%
+    rename(geoid = GEOID10) %>%
+    st_centroid() # get geo-centroid of each zctas
 })
 ```
 
@@ -160,32 +178,56 @@ pwalk(hur_info, function(track, hurricane, ...) {
     st_cast("LINESTRING") %>%
     st_write(str_c("tract/", hurricane, "/track_line.geojson"))
 })
+
+pwalk(hur_info, function(track, hurricane, ...) {
+  st_write(track, str_c("zcta/", hurricane, "/track_points.geojson"))
+  
+  track %>%
+    st_combine() %>%
+    st_cast("LINESTRING") %>%
+    st_write(str_c("zcta/", hurricane, "/track_line.geojson"))
+})
 ```
 
 ## Calculate closest distance
 
 ```{r}
-hur_info$closest_dist <- pmap(hur_info, function(track, states_sf, ...) {
-  calc_closest_dist(track, states_sf)
+hur_info$tract_closest_dist <- pmap(hur_info, function(track, tracts_sf, ...) {
+  calc_closest_dist(track, tracts_sf, geoid = "geoid")
+})
+
+hur_info$zcta_closest_dist <- pmap(hur_info, function(track, zctas_sf, ...) {
+  calc_closest_dist(track, zctas_sf, geoid = "geoid")
 })
 ```
 
 ## Calculate wind speed
 
 ```{r}
-hur_info$anderson_wind <- pmap(hur_info, function(hurdat, states_sf, ...) {
-  calc_anderson_wind(hurdat, states_sf)
+hur_info$tract_anderson_wind <- pmap(hur_info, function(hurdat, tracts_sf, ...) {
+  calc_anderson_wind(hurdat, tracts_sf)
+})
+
+hur_info$zcta_anderson_wind <- pmap(hur_info, function(hurdat, zctas_sf, ...) {
+  calc_anderson_wind(hurdat, zctas_sf)
 })
 ```
 
 ## Join output and write to file
 
 ```{r}
-pwalk(hur_info, function(closest_dist, anderson_wind, hurricane, ...) {
-  full_join(closest_dist, anderson_wind, join_by(geoid)) %>%
+pwalk(hur_info, function(tract_closest_dist, tract_anderson_wind, hurricane, ...) {
+  full_join(tract_closest_dist, tract_anderson_wind, join_by(geoid)) %>%
     relocate(closest_date, .before = closest_dist) %>%
     rename(highwind_datetime = datetime, closest_datetime = closest_date) %>%
     write_csv(str_c("tract/", hurricane, "/distance_wind.csv"))
+})
+
+pwalk(hur_info, function(zcta_closest_dist, zcta_anderson_wind, hurricane, ...) {
+  full_join(zcta_closest_dist, zcta_anderson_wind, join_by(geoid)) %>%
+    relocate(closest_date, .before = closest_dist) %>%
+    rename(highwind_datetime = datetime, closest_datetime = closest_date) %>%
+    write_csv(str_c("zcta/", hurricane, "/distance_wind.csv"))
 })
 ```
 
