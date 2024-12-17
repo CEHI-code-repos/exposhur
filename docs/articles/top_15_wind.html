@@ -74,10 +74,6 @@
 
     
     
-<p>Start Time</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">start_time</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.time</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">start_time</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
 <h2 id="program-background">Program Background<a class="anchor" aria-label="anchor" href="#program-background"></a>
 </h2>
@@ -89,7 +85,7 @@ Wind</p></li>
 <p>Program description:</p>
 <p>Maximum wind was calculated for each tract using the
 <code>stormwindmodel</code> published by Anderson at the geocentroid for
-each tract.</p>
+each tract/zcta.</p>
 </li>
 <li>
 <p>Data:</p>
@@ -103,7 +99,7 @@ each tract.</p>
 <ul>
 <li>Specify all storms</li>
 <li>Download and process hurdat2 tracks</li>
-<li>Calculate geo-centroid for each tract</li>
+<li>Calculate geo-centroid for each tract/zcta</li>
 <li>Utilize stormwindmodel to produce wind exposure estimates</li>
 <li>Output imputed track geojsons for visualization</li>
 </ul>
@@ -121,8 +117,9 @@ each tract.</p>
 <li>
 <p>Output files</p>
 <ul>
+<li><p><code>tract/{storm_id}/distance_wind.csv</code></p></li>
 <li>
-<p><code>tract/{storm_id}/distance_wind.csv</code></p>
+<p><code>zcta/{storm_id}/distance_wind.csv</code></p>
 <table class="table">
 <colgroup>
 <col width="50%">
@@ -135,7 +132,7 @@ each tract.</p>
 <tbody>
 <tr class="odd">
 <td>geoid</td>
-<td>Geographic identifier</td>
+<td>2010 geographic identifier</td>
 </tr>
 <tr class="even">
 <td>closest_datetime</td>
@@ -173,10 +170,16 @@ point (minutes)</td>
 </table>
 </li>
 <li><p><code>tract/{storm_id}/track_line.geojson</code></p></li>
+<li><p><code>zcta/{storm_id}/track_line.geojson</code></p></li>
 <li><p><code>tract/{storm_id}/track_points.geojson</code></p></li>
+<li><p><code>zcta/{storm_id}/track_points.geojson</code></p></li>
 </ul>
 </li>
 </ul>
+<p>Start Time</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">start_time</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.time</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="va">start_time</span>, <span class="st">"\n"</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ryanzomorrodi.github.io/exposur/">exposur</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org" class="external-link">tidyverse</a></span><span class="op">)</span></span>
@@ -184,25 +187,7 @@ point (minutes)</td>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://r-spatial.github.io/sf/" class="external-link">sf</a></span><span class="op">)</span></span></code></pre></div>
 <p>The following hurricanes were selected.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># manually selected states of interest for each storm</span></span>
-<span><span class="va">hur_info</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tibble.tidyverse.org/reference/tribble.html" class="external-link">tribble</a></span><span class="op">(</span></span>
-<span>  <span class="op">~</span> <span class="va">hurricane</span>, <span class="op">~</span> <span class="va">states</span>,</span>
-<span>  <span class="st">"KATRINA-2005"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"LA"</span>, <span class="st">"MS"</span>, <span class="st">"AL"</span>, <span class="st">"FL"</span>, <span class="st">"TN"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"HARVEY-2017"</span>,   <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TX"</span>, <span class="st">"LA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"SANDY-2012"</span>,    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NJ"</span>, <span class="st">"DE"</span>, <span class="st">"MD"</span>, <span class="st">"NY"</span>, <span class="st">"CT"</span>, <span class="st">"RI"</span>, <span class="st">"VA"</span>, <span class="st">"MA"</span>, <span class="st">"PA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"IRMA-2017"</span>,     <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"SC"</span>, <span class="st">"AL"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"IKE-2008"</span>,      <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TX"</span>, <span class="st">"LA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"IVAN-2004"</span>,     <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"AL"</span>, <span class="st">"MS"</span>, <span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"TN"</span>, <span class="st">"NC"</span>, <span class="st">"SC"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"RITA-2005"</span>,     <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TX"</span>, <span class="st">"LA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"FLORENCE-2018"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"NC"</span>, <span class="st">"SC"</span>, <span class="st">"GA"</span>, <span class="st">"VA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"MICHAEL-2018"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"AL"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"WILMA-2005"</span>,    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"CHARLEY-2004"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"SC"</span>, <span class="st">"NC"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"IRENE-2011"</span>,    <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SC"</span>, <span class="st">"NC"</span>, <span class="st">"VA"</span>, <span class="st">"MD"</span>, <span class="st">"DE"</span>, <span class="st">"NJ"</span>, <span class="st">"PA"</span>, <span class="st">"NY"</span>, <span class="st">"CT"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"FRANCES-2004"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"SC"</span>, <span class="st">"NC"</span>, <span class="st">"AL"</span>, <span class="st">"TN"</span>, <span class="st">"VA"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"ALLISON-2001"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"TX"</span>, <span class="st">"LA"</span>, <span class="st">"MS"</span>, <span class="st">"AL"</span>, <span class="st">"FL"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"MATTHEW-2016"</span>,  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"FL"</span>, <span class="st">"GA"</span>, <span class="st">"SC"</span>, <span class="st">"NC"</span>, <span class="st">"VA"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">hur_info</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">readRDS</a></span><span class="op">(</span> <span class="st">"raw-data/RF1_Hurricanes.rds"</span><span class="op">)</span></span>
 <span><span class="co"># get fips codes for each state</span></span>
 <span><span class="va">fips_codes</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="fu">tigris</span><span class="fu">::</span><span class="va"><a href="https://rdrr.io/pkg/tigris/man/fips_codes.html" class="external-link">fips_codes</a></span>, <span class="va">state</span>, <span class="va">state_code</span><span class="op">)</span></span>
 <span><span class="va">hur_info</span><span class="op">$</span><span class="va">fips</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">states</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
@@ -233,15 +218,27 @@ point (minutes)</td>
 <h2 id="get-states">Get states<a class="anchor" aria-label="anchor" href="#get-states"></a>
 </h2>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">states_sf</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">start_date</span>, <span class="va">fips</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">states_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/map.html" class="external-link">map</a></span><span class="op">(</span><span class="va">fips</span>, </span>
+<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">tracts_sf</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">start_date</span>, <span class="va">fips</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">tracts_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/map.html" class="external-link">map</a></span><span class="op">(</span><span class="va">fips</span>, </span>
 <span>    <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/tigris/man/tracts.html" class="external-link">tracts</a></span><span class="op">(</span>state <span class="op">=</span> <span class="va">.x</span>, year <span class="op">=</span> <span class="fl">2010</span>, cb <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">states_list</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">tracts_list</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>GEOID <span class="op">=</span> <span class="fu"><a href="https://stringr.tidyverse.org/reference/str_sub.html" class="external-link">str_sub</a></span><span class="op">(</span><span class="va">GEO_ID</span>, <span class="op">-</span><span class="fl">11</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="co"># get tract geoids</span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_query.html" class="external-link">st_is_empty</a></span><span class="op">(</span><span class="va">.</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="co"># remove tracts with empty geographies</span></span>
 <span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_transform.html" class="external-link">st_transform</a></span><span class="op">(</span><span class="fl">4326</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="co"># transform to WGS 84</span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>geoid <span class="op">=</span> <span class="va">GEOID</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_unary.html" class="external-link">st_centroid</a></span><span class="op">(</span><span class="op">)</span> <span class="co"># get geo-centroid of each tract</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">hur_info</span><span class="op">$</span><span class="va">zctas_sf</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">start_date</span>, <span class="va">fips</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">zctas_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/map.html" class="external-link">map</a></span><span class="op">(</span><span class="va">fips</span>, </span>
+<span>    <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/tigris/man/zctas.html" class="external-link">zctas</a></span><span class="op">(</span>state <span class="op">=</span> <span class="va">.x</span>, year <span class="op">=</span> <span class="fl">2010</span>, cb <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="va">zctas_list</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_query.html" class="external-link">st_is_empty</a></span><span class="op">(</span><span class="va">.</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="co"># remove zctas with empty geographies</span></span>
+<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_transform.html" class="external-link">st_transform</a></span><span class="op">(</span><span class="fl">4326</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>geoid <span class="op">=</span> <span class="va">GEOID10</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_unary.html" class="external-link">st_centroid</a></span><span class="op">(</span><span class="op">)</span> <span class="co"># get geo-centroid of each zctas</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
@@ -259,33 +256,57 @@ point (minutes)</td>
 <span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_combine.html" class="external-link">st_combine</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_cast.html" class="external-link">st_cast</a></span><span class="op">(</span><span class="st">"LINESTRING"</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_write.html" class="external-link">st_write</a></span><span class="op">(</span><span class="fu"><a href="https://stringr.tidyverse.org/reference/str_c.html" class="external-link">str_c</a></span><span class="op">(</span><span class="st">"tract/"</span>, <span class="va">hurricane</span>, <span class="st">"/track_line.geojson"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pwalk</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">track</span>, <span class="va">hurricane</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_write.html" class="external-link">st_write</a></span><span class="op">(</span><span class="va">track</span>, <span class="fu"><a href="https://stringr.tidyverse.org/reference/str_c.html" class="external-link">str_c</a></span><span class="op">(</span><span class="st">"zcta/"</span>, <span class="va">hurricane</span>, <span class="st">"/track_points.geojson"</span><span class="op">)</span><span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="va">track</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/geos_combine.html" class="external-link">st_combine</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_cast.html" class="external-link">st_cast</a></span><span class="op">(</span><span class="st">"LINESTRING"</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://r-spatial.github.io/sf/reference/st_write.html" class="external-link">st_write</a></span><span class="op">(</span><span class="fu"><a href="https://stringr.tidyverse.org/reference/str_c.html" class="external-link">str_c</a></span><span class="op">(</span><span class="st">"zcta/"</span>, <span class="va">hurricane</span>, <span class="st">"/track_line.geojson"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="calculate-closest-distance">Calculate closest distance<a class="anchor" aria-label="anchor" href="#calculate-closest-distance"></a>
 </h2>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">closest_dist</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">track</span>, <span class="va">states_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="../reference/calc_closest_dist.html">calc_closest_dist</a></span><span class="op">(</span><span class="va">track</span>, <span class="va">states_sf</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">tract_closest_dist</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">track</span>, <span class="va">tracts_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/calc_closest_dist.html">calc_closest_dist</a></span><span class="op">(</span><span class="va">track</span>, <span class="va">tracts_sf</span>, geoid <span class="op">=</span> <span class="st">"geoid"</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">hur_info</span><span class="op">$</span><span class="va">zcta_closest_dist</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">track</span>, <span class="va">zctas_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/calc_closest_dist.html">calc_closest_dist</a></span><span class="op">(</span><span class="va">track</span>, <span class="va">zctas_sf</span>, geoid <span class="op">=</span> <span class="st">"geoid"</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="calculate-wind-speed">Calculate wind speed<a class="anchor" aria-label="anchor" href="#calculate-wind-speed"></a>
 </h2>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">anderson_wind</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">states_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="../reference/calc_anderson_wind.html">calc_anderson_wind</a></span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">states_sf</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">hur_info</span><span class="op">$</span><span class="va">tract_anderson_wind</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">tracts_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/calc_anderson_wind.html">calc_anderson_wind</a></span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">tracts_sf</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">hur_info</span><span class="op">$</span><span class="va">zcta_anderson_wind</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pmap</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">zctas_sf</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="../reference/calc_anderson_wind.html">calc_anderson_wind</a></span><span class="op">(</span><span class="va">hurdat</span>, <span class="va">zctas_sf</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="join-output-and-write-to-file">Join output and write to file<a class="anchor" aria-label="anchor" href="#join-output-and-write-to-file"></a>
 </h2>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pwalk</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">closest_dist</span>, <span class="va">anderson_wind</span>, <span class="va">hurricane</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">full_join</a></span><span class="op">(</span><span class="va">closest_dist</span>, <span class="va">anderson_wind</span>, <span class="fu"><a href="https://dplyr.tidyverse.org/reference/join_by.html" class="external-link">join_by</a></span><span class="op">(</span><span class="va">geoid</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pwalk</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">tract_closest_dist</span>, <span class="va">tract_anderson_wind</span>, <span class="va">hurricane</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">full_join</a></span><span class="op">(</span><span class="va">tract_closest_dist</span>, <span class="va">tract_anderson_wind</span>, <span class="fu"><a href="https://dplyr.tidyverse.org/reference/join_by.html" class="external-link">join_by</a></span><span class="op">(</span><span class="va">geoid</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/relocate.html" class="external-link">relocate</a></span><span class="op">(</span><span class="va">closest_date</span>, .before <span class="op">=</span> <span class="va">closest_dist</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>highwind_datetime <span class="op">=</span> <span class="va">datetime</span>, closest_datetime <span class="op">=</span> <span class="va">closest_date</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
 <span>    <span class="fu"><a href="https://readr.tidyverse.org/reference/write_delim.html" class="external-link">write_csv</a></span><span class="op">(</span><span class="fu"><a href="https://stringr.tidyverse.org/reference/str_c.html" class="external-link">str_c</a></span><span class="op">(</span><span class="st">"tract/"</span>, <span class="va">hurricane</span>, <span class="st">"/distance_wind.csv"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span><span class="op">)</span></span>
+<span> </span>
+<span><span class="fu"><a href="https://purrr.tidyverse.org/reference/pmap.html" class="external-link">pwalk</a></span><span class="op">(</span><span class="va">hur_info</span>, <span class="kw">function</span><span class="op">(</span><span class="va">zcta_closest_dist</span>, <span class="va">zcta_anderson_wind</span>, <span class="va">hurricane</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">full_join</a></span><span class="op">(</span><span class="va">zcta_closest_dist</span>, <span class="va">zcta_anderson_wind</span>, <span class="fu"><a href="https://dplyr.tidyverse.org/reference/join_by.html" class="external-link">join_by</a></span><span class="op">(</span><span class="va">geoid</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/relocate.html" class="external-link">relocate</a></span><span class="op">(</span><span class="va">closest_date</span>, .before <span class="op">=</span> <span class="va">closest_dist</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/rename.html" class="external-link">rename</a></span><span class="op">(</span>highwind_datetime <span class="op">=</span> <span class="va">datetime</span>, closest_datetime <span class="op">=</span> <span class="va">closest_date</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://readr.tidyverse.org/reference/write_delim.html" class="external-link">write_csv</a></span><span class="op">(</span><span class="fu"><a href="https://stringr.tidyverse.org/reference/str_c.html" class="external-link">str_c</a></span><span class="op">(</span><span class="st">"zcta/"</span>, <span class="va">hurricane</span>, <span class="st">"/distance_wind.csv"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span></span></code></pre></div>
 <p>End Time</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
