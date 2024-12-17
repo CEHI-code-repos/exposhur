@@ -93,25 +93,7 @@ library(sf)
 The following hurricanes were selected.
 
 ```{r}
-# manually selected states of interest for each storm
-hur_info <- tribble(
-  ~ hurricane, ~ states,
-  "KATRINA-2005",  c("LA", "MS", "AL", "FL", "TN"),
-  "HARVEY-2017",   c("TX", "LA"),
-  "SANDY-2012",    c("NJ", "DE", "MD", "NY", "CT", "RI", "VA", "MA", "PA"),
-  "IRMA-2017",     c("FL", "GA", "SC", "AL"),
-  "IKE-2008",      c("TX", "LA"),
-  "IVAN-2004",     c("AL", "MS", "FL", "GA", "TN", "NC", "SC"),
-  "RITA-2005",     c("TX", "LA"),
-  "FLORENCE-2018", c("NC", "SC", "GA", "VA"),
-  "MICHAEL-2018",  c("FL", "GA", "AL"),
-  "WILMA-2005",    c("FL"),
-  "CHARLEY-2004",  c("FL", "GA", "SC", "NC"),
-  "IRENE-2011",    c("SC", "NC", "VA", "MD", "DE", "NJ", "PA", "NY", "CT"),
-  "FRANCES-2004",  c("FL", "GA", "SC", "NC", "AL", "TN", "VA"),
-  "ALLISON-2001",  c("TX", "LA", "MS", "AL", "FL"),
-  "MATTHEW-2016",  c("FL", "GA", "SC", "NC", "VA")
-)
+hur_info <- readRDS( "raw-data/RF1_Hurricanes.rds")
 # get fips codes for each state
 fips_codes <- distinct(tigris::fips_codes, state, state_code)
 hur_info$fips <- pmap(hur_info, function(states, ...) {
