@@ -39,6 +39,8 @@ knitr::opts_chunk$set(
 
     -   HURDAT2 - to get storm dates
 
+    -   [2010 ZCTA to County Relationships](https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt)
+
 -   Restrictions:
 
 -   Outline of program/analysis:
@@ -50,6 +52,8 @@ knitr::opts_chunk$set(
     -   Extract outage data for dates specified by the HURDAT2 plus 2 days after
 
     -   Calculate outage estimates for the maximum percentage of customers without electricity and the average duration of outages
+
+    -   Crosswalk county estimates to ZCTA using 2010 ZCTA to County Relationship file
 
 -   Author: Ryan Zomorrodi
 
@@ -63,6 +67,8 @@ knitr::opts_chunk$set(
 -   Output files
 
     -   `tract/{storm id}/outage.csv`
+
+    -   `zcta/{storm id}/outage.csv`
 
         | Column | Description |
         |------------------------------------|------------------------------------|
@@ -164,6 +170,30 @@ pwalk(hur_info, function(outage, hurricane, start_date, ...) {
     write_csv(outage, str_c("tract/", hurricane, "/outage.csv"))
   }
 })
+```
+
+## Crosswalk to zctas
+
+```{r}
+zcta_to_county <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
+  mutate(geoid_z = str_c(STATE, ZCTA5)) %>%
+  mutate(geoid_c = str_c(STATE, COUNTY))
+
+outages <- Sys.glob("tract/*/outage.csv") %>%
+  map(function(outage_path) {
+    outage <- read_csv(outage_path, col_types = cols(geoid = col_character()))
+    
+    outage %>%
+      left_join(zcta_to_county, join_by(geoid == geoid_c)) %>%
+      group_by(geoid_z) %>%
+      summarise(
+        max_pct_out_xwalk = sum(ZPOPPCT * max_pct_out) / 100,
+        avg_customer_hrs_out_xwalk = sum(ZPOPPCT * avg_customer_hrs_out) / 100
+      )
+    
+    outage %>%
+      write_csv(str_replace(outage_path, "tract", "zcta"))
+  })
 ```
 
 End Time
