@@ -10,8 +10,7 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+  comment = "#>"
 )
 ```
 
@@ -78,12 +77,12 @@ knitr::opts_chunk$set(
 
 Start Time
 
-```{r}
+```{r, eval = FALSE}
 start_time <- Sys.time()
 cat(start_time, "\n")
 ```
 
-```{r setup}
+```{r setup, eval = FALSE}
 library(exposur)
 library(tidyverse)
 library(tigris)
@@ -92,7 +91,7 @@ library(sf)
 
 The following hurricanes were selected.
 
-```{r}
+```{r, eval = FALSE}
 hur_info <- readRDS( "raw-data/RF1_Hurricanes.rds")
 # get fips codes for each state
 fips_codes <- distinct(tigris::fips_codes, state, state_code)
@@ -103,7 +102,7 @@ hur_info$fips <- pmap(hur_info, function(states, ...) {
 
 ## Get hurdat2 info for each storm
 
-```{r}
+```{r, eval = FALSE}
 exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
 
 hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
@@ -123,7 +122,7 @@ hur_info <- unnest_wider(hur_info, hurdat2)
 
 ## Get outage data
 
-```{r}
+```{r, eval = FALSE}
 hur_info$eaglei <- pmap(hur_info, function(start_date, end_date, ...) {
   if (year(start_date) < 2014) {
     return(list(NULL))
@@ -138,7 +137,7 @@ hur_info$eaglei <- pmap(hur_info, function(start_date, end_date, ...) {
 
 ## Calculate outage
 
-```{r}
+```{r, eval = FALSE}
 hur_info$outage <- pmap(hur_info, function(eaglei, fips, start_date, ...) {
   if (year(start_date) < 2014) {
     return(list(NULL))
@@ -156,7 +155,7 @@ pwalk(hur_info, function(outage, hurricane, start_date, ...) {
 
 ## Crosswalk to zctas
 
-```{r}
+```{r, eval = FALSE}
 zcta_to_county <- read_csv("https://www2.census.gov/geo/docs/maps-data/data/rel/zcta_county_rel_10.txt") %>%
   mutate(geoid_z = str_c(STATE, ZCTA5)) %>%
   mutate(geoid_c = str_c(STATE, COUNTY))
@@ -180,8 +179,189 @@ outages <- Sys.glob("tract/*/outage.csv") %>%
 
 End Time
 
-```{r}
+```{r, eval = FALSE}
 end_time <- Sys.time()
 cat("End time: ", end_time, "\n")
 cat("Duration: ", start_time - end_time, "\n")
+```
+
+## Visualizations
+
+```{r, include = FALSE}
+library(tidyverse)
+library(tigris)
+library(sf)
+
+# repeat from above
+hur_info <- readRDS( "../raw-data/RF1_Hurricanes.rds") %>%
+  filter(year >= 2014)
+fips_codes <- distinct(tigris::fips_codes, state, state_code)
+hur_info$fips <- pmap(hur_info, function(states, ...) {
+  fips_codes$state_code[match(states, fips_codes$state)]
+})
+
+hur_info$outage <- pmap(hur_info, function(hurricane, ...) {
+  read_csv(
+    str_c("../tract/", hurricane, "/outage.csv"),
+    col_types = cols(geoid = col_character())
+  )
+})
+
+hur_info$counties_sf <- pmap(hur_info, function(fips, ...) {
+  counites_list <- map(fips, 
+    ~ counties(state = .x, year = 2010, cb = TRUE)
+  )
+  bind_rows(counites_list) %>%
+    mutate(GEOID = str_sub(GEO_ID, -5)) %>%
+    filter(!st_is_empty(.))
+})
+
+hur_info$states_sf <- pmap(hur_info, function(fips, ...) {
+  states(year = 2010, cb = TRUE) %>%
+    filter(STATE %in% fips)
+})
+
+hur_info$track_line <- pmap(hur_info, function(hurricane, ...) {
+  st_read(str_c("../tract/", hurricane, "/track_line.geojson"))
+})
+```
+
+```{r, fig.width = 10, fig.height = 6, echo = FALSE, warning = FALSE}
+library(patchwork)
+library(classInt)
+
+hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, states_sf, track_line,  ...) {
+  out_sf <- left_join(
+    counties_sf, 
+    outage, 
+    by = join_by(GEOID == geoid)
+  ) %>%
+    mutate(max_pct_out = max_pct_out * 100) %>%
+    mutate(quantile_max_pct_out = classify_intervals(round(max_pct_out, 3), n = 5, style = "quantile"))
+  
+  ggplot(out_sf) +
+    geom_sf(aes(fill = quantile_max_pct_out), color = NA) +
+    geom_sf(data = states_sf, fill = NA) +
+    geom_sf(
+      data = st_intersection(
+        st_transform(track_line, st_crs(states_sf)), 
+        st_as_sfc(st_bbox(states_sf))
+      )
+    ) +
+    scale_fill_brewer(palette = "Oranges", na.value= "grey") +
+    coord_sf(crs = "ESRI:102003") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ) +
+    labs(title = hurricane, fill = "")
+})
+
+wrap_plots(
+  hur_info$out_plots,
+  ncol = 3
+) +
+   plot_annotation(
+    title = "Estimated Maximum Percentage of Customers without Electricity",
+    theme = theme(plot.title = element_text(size = 16))
+  )
+```
+
+```{r, echo = FALSE}
+library(gt)
+
+hur_info$out_table <- pmap(hur_info, function(hurricane, outage, ...) {
+  outage %>%
+    mutate(max_pct_out = max_pct_out * 100) %>%
+    summarize(
+      Storm = hurricane,
+      Mean = mean(max_pct_out, na.rm = TRUE),
+      SD = sd(max_pct_out, na.rm = TRUE),
+      Min = min(max_pct_out, na.rm = TRUE),
+      `25% Quantile` = quantile(max_pct_out, probs = 0.25, na.rm = TRUE),
+      Median = quantile(max_pct_out, probs = 0.5, na.rm = TRUE),
+      `75% Quantile` = quantile(max_pct_out, probs = 0.75, na.rm = TRUE),
+      Max = max(max_pct_out, na.rm = TRUE),
+      Distribution = list(max_pct_out)
+    ) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 3)))
+})
+    
+bind_rows(hur_info$out_table) %>%
+  gt() %>%
+  gtExtras::gt_plt_dist(Distribution) %>%
+  tab_header(
+    title = "Estimated Maximum Percentage of Customers without Electricity",
+  )
+```
+
+
+```{r, fig.width = 10, fig.height = 6, echo = FALSE, warning = FALSE}
+library(patchwork)
+
+hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, states_sf, track_line,  ...) {
+  out_sf <- left_join(
+    counties_sf, 
+    outage, 
+    by = join_by(GEOID == geoid)
+  ) %>%
+    mutate(quantile_avg_customer_hrs_out = classInt::classify_intervals(round(avg_customer_hrs_out, 3), n = 5, style = "quantile"))
+  
+  ggplot(out_sf) +
+    geom_sf(aes(fill = quantile_avg_customer_hrs_out), color = NA) +
+    geom_sf(data = states_sf, fill = NA) +
+    geom_sf(
+      data = st_intersection(
+        st_transform(track_line, st_crs(states_sf)), 
+        st_as_sfc(st_bbox(states_sf))
+      )
+    ) +
+    scale_fill_brewer(palette = "Reds", na.value= "grey") +
+    coord_sf(crs = "ESRI:102003") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ) +
+    labs(title = hurricane, fill = "")
+})
+
+wrap_plots(
+  hur_info$out_plots,
+  ncol = 3
+) +
+   plot_annotation(
+    title = "Estimated Average Customer Hours without Electricity",
+    theme = theme(plot.title = element_text(size = 16))
+  )
+```
+
+```{r, echo = FALSE}
+library(gt)
+
+hur_info$out_table <- pmap(hur_info, function(hurricane, outage, ...) {
+  outage %>%
+    summarize(
+      Storm = hurricane,
+      Mean = mean(avg_customer_hrs_out, na.rm = TRUE),
+      SD = sd(avg_customer_hrs_out, na.rm = TRUE),
+      Min = min(avg_customer_hrs_out, na.rm = TRUE),
+      `25% Quantile` = quantile(avg_customer_hrs_out, probs = 0.25, na.rm = TRUE),
+      Median = quantile(avg_customer_hrs_out, probs = 0.5, na.rm = TRUE),
+      `75% Quantile` = quantile(avg_customer_hrs_out, probs = 0.75, na.rm = TRUE),
+      Max = max(avg_customer_hrs_out, na.rm = TRUE),
+      Distribution = list(avg_customer_hrs_out)
+    ) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 3)))
+})
+    
+bind_rows(hur_info$out_table) %>%
+  gt() %>%
+  gtExtras::gt_plt_dist(Distribution) %>%
+  tab_header(
+    title = "Estimated Average Customer Hours without Electricity",
+  )
 ```

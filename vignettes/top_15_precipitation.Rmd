@@ -10,8 +10,7 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
+  comment = "#>"
 )
 ```
 
@@ -66,7 +65,7 @@ knitr::opts_chunk$set(
         |             | Note: there may be NAs for a small number of coastline tract which were not entirely covered by nClimGrid |
         +-------------+-----------------------------------------------------------------------------------------------------------+
 
-```{r setup}
+```{r setup, eval = FALSE}
 library(exposur)
 library(tidyverse)
 library(tigris)
@@ -75,7 +74,7 @@ library(sf)
 
 The following hurricanes were selected.
 
-```{r}
+```{r, eval = FALSE}
 hur_info <- readRDS( "raw-data/RF1_Hurricanes.rds")
 # get fips codes for each state
 fips_codes <- distinct(tigris::fips_codes, state, state_code)
@@ -86,7 +85,7 @@ hur_info$fips <- pmap(hur_info, function(states, ...) {
 
 ## Get hurdat2 info for each storm
 
-```{r}
+```{r, eval = FALSE}
 exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
 
 hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
@@ -106,7 +105,7 @@ hur_info <- unnest_wider(hur_info, hurdat2)
 
 ## Get states
 
-```{r, warning = FALSE}
+```{r, warning = FALSE, eval = FALSE}
 hur_info$tracts_sf <- pmap(hur_info, function(start_date, fips, ...) {
   tracts_list <- map(fips, 
     ~ tracts(state = .x, year = 2010, cb = TRUE)
@@ -131,7 +130,7 @@ hur_info$zctas_sf <- pmap(hur_info, function(start_date, fips, ...) {
 
 ## Get nClimGrid
 
-```{r}
+```{r, eval = FALSE}
 hur_info$nClimGrid <- pmap(hur_info, function(start_date, end_date, ...) {
   get_nClimGrid(
     interval = interval(start_date, end_date + days(2)),
@@ -142,7 +141,7 @@ hur_info$nClimGrid <- pmap(hur_info, function(start_date, end_date, ...) {
 
 ## Calculate daily precipitation
 
-```{r}
+```{r, eval = FALSE}
 hur_info$tract_prcp_daily_avg <- pmap(hur_info, function(nClimGrid, tracts_sf, ...) {
   calc_daily_avgs(
     nClimGrid = nClimGrid,
@@ -170,8 +169,144 @@ pwalk(hur_info, function(zcta_prcp_daily_avg, hurricane, ...) {
 
 End Time
 
-```{r}
+```{r, eval = FALSE }
 end_time <- Sys.time()
 cat("End time: ", end_time, "\n")
 cat("Duration: ", start_time - end_time, "\n")
+```
+
+## Visualizations
+
+```{r, include = FALSE}
+library(tidyverse)
+library(tigris)
+library(sf)
+
+# repeat from above
+hur_info <- readRDS( "../raw-data/RF1_Hurricanes.rds")
+fips_codes <- distinct(tigris::fips_codes, state, state_code)
+hur_info$fips <- pmap(hur_info, function(states, ...) {
+  fips_codes$state_code[match(states, fips_codes$state)]
+})
+
+hur_info$prcp <- pmap(hur_info, function(hurricane, ...) {
+  read_csv(
+    str_c("../tract/", hurricane, "/daily_prcp.csv"),
+    col_types = cols(geoid = col_character())
+  )
+})
+
+hur_info$tract_sf <- pmap(hur_info, function(fips, ...) {
+  tract_list <- map(fips, 
+    ~ tracts(state = .x, year = 2010, cb = TRUE)
+  )
+  bind_rows(tract_list) %>%
+    mutate(GEOID = str_sub(GEO_ID, -11)) %>%
+    filter(!st_is_empty(.))
+})
+
+hur_info$states_sf <- pmap(hur_info, function(fips, ...) {
+  states(year = 2010, cb = TRUE) %>%
+    filter(STATE %in% fips)
+})
+
+hur_info$track_line <- pmap(hur_info, function(hurricane, ...) {
+  st_read(str_c("../tract/", hurricane, "/track_line.geojson"))
+})
+
+hur_info$distance_wind <- pmap(hur_info, function(hurricane, ...) {
+  read_csv(
+    str_c("../tract/", hurricane, "/distance_wind.csv"),
+    col_types = cols(geoid = col_character())
+  )})
+```
+
+```{r, fig.width = 10, fig.height = 10, echo = FALSE, warning = FALSE}
+library(patchwork)
+
+hur_info$prcp_plots <- pmap(hur_info, function(hurricane, tract_sf, distance_wind, prcp, states_sf, track_line,  ...) {
+  prcp_sf <- left_join(
+    prcp, 
+    distance_wind, 
+    by = join_by(geoid)
+  ) %>%
+    mutate(closest_date = as_date(closest_datetime)) %>%
+    group_by(geoid) %>%
+    filter(date %within% interval(closest_date - day(2), closest_date + day(1))) %>%
+    summarize(mean_prcp = sum(mean_prcp)) %>%
+    left_join(
+      x = tract_sf,
+      by = join_by(GEOID == geoid)
+    ) %>%
+    mutate(quantile_mean_prcp = classInt::classify_intervals(round(mean_prcp, 3), n = 5, style = "quantile"))
+
+  
+  ggplot(prcp_sf) +
+    geom_sf(aes(fill = quantile_mean_prcp), color = NA) +
+    geom_sf(data = states_sf, fill = NA) +
+    geom_sf(
+      data = st_intersection(
+        st_transform(track_line, st_crs(states_sf)), 
+        st_as_sfc(st_bbox(states_sf))
+      )
+    ) +
+    scale_fill_brewer(palette = "Blues", na.value= "grey") +
+    coord_sf(crs = "ESRI:102003") +
+    theme_bw() +
+    theme(
+      axis.text.x = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks = element_blank()
+    ) +
+    labs(title = hurricane, fill = "")
+})
+
+wrap_plots(
+  hur_info$prcp_plots,
+  ncol = 3
+) +
+   plot_annotation(
+    title = "Estimated Precipitation (mm)",
+    subtitle = "Using Anderson Definitions (2 days before and 1 day after nearest approach)",
+    theme = theme(plot.title = element_text(size = 16))
+  )
+```
+
+
+```{r, echo = FALSE, warning = FALSE}
+library(gt)
+
+hur_info$prcp_table <- pmap(hur_info, function(hurricane, tract_sf, distance_wind, prcp, states_sf, track_line,  ...) {
+  left_join(
+    prcp, 
+    distance_wind, 
+    by = join_by(geoid)
+  ) %>%
+    mutate(closest_date = as_date(closest_datetime)) %>%
+    group_by(geoid) %>%
+    filter(date %within% interval(closest_date - day(2), closest_date + day(1))) %>%
+    summarize(mean_prcp = sum(mean_prcp)) %>%
+    ungroup() %>%
+    summarize(
+      Storm = hurricane,
+      Mean = mean(mean_prcp, na.rm = TRUE),
+      SD = sd(mean_prcp, na.rm = TRUE),
+      Min = min(mean_prcp, na.rm = TRUE),
+      `25% Quantile` = quantile(mean_prcp, probs = 0.25, na.rm = TRUE),
+      Median = quantile(mean_prcp, probs = 0.5, na.rm = TRUE),
+      `75% Quantile` = quantile(mean_prcp, probs = 0.75, na.rm = TRUE),
+      Max = max(mean_prcp, na.rm = TRUE),
+      `Proportion 75+ mm` = mean(mean_prcp >= 75, na.rm = TRUE),
+      Distribution = list(mean_prcp)
+    ) %>%
+    mutate(across(where(is.numeric), ~ round(.x, 3)))
+})
+    
+bind_rows(hur_info$prcp_table) %>%
+  gt() %>%
+  gtExtras::gt_plt_dist(Distribution) %>%
+  tab_header(
+    title = "Estimated Precipitation (mm)",
+    subtitle = "Using Anderson Definitions (2 days before and 1 day after nearest approach)"
+  )
 ```
