@@ -237,12 +237,10 @@ hur_info$prcp_plots <- pmap(hur_info, function(hurricane, tract_sf, distance_win
     left_join(
       x = tract_sf,
       by = join_by(GEOID == geoid)
-    ) %>%
-    mutate(quantile_mean_prcp = classInt::classify_intervals(round(mean_prcp, 3), n = 5, style = "quantile"))
-
+    )
   
   ggplot(prcp_sf) +
-    geom_sf(aes(fill = quantile_mean_prcp), color = NA) +
+    geom_sf(aes(fill = mean_prcp), color = NA) +
     geom_sf(data = states_sf, fill = NA) +
     geom_sf(
       data = st_intersection(
@@ -250,7 +248,7 @@ hur_info$prcp_plots <- pmap(hur_info, function(hurricane, tract_sf, distance_win
         st_as_sfc(st_bbox(states_sf))
       )
     ) +
-    scale_fill_brewer(palette = "Blues", na.value= "grey") +
+    scale_fill_distiller(palette = "Blues", na.value= "grey", direction = 1) +
     coord_sf(crs = "ESRI:102003") +
     theme_bw() +
     theme(

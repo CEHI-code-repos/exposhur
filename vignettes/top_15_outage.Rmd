@@ -236,11 +236,10 @@ hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, st
     outage, 
     by = join_by(GEOID == geoid)
   ) %>%
-    mutate(max_pct_out = max_pct_out * 100) %>%
-    mutate(quantile_max_pct_out = classify_intervals(round(max_pct_out, 3), n = 5, style = "quantile"))
+    mutate(max_pct_out = max_pct_out * 100)
   
   ggplot(out_sf) +
-    geom_sf(aes(fill = quantile_max_pct_out), color = NA) +
+    geom_sf(aes(fill = max_pct_out), color = NA) +
     geom_sf(data = states_sf, fill = NA) +
     geom_sf(
       data = st_intersection(
@@ -248,7 +247,7 @@ hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, st
         st_as_sfc(st_bbox(states_sf))
       )
     ) +
-    scale_fill_brewer(palette = "Oranges", na.value= "grey") +
+    scale_fill_distiller(palette = "Oranges", na.value= "grey", direction = 1) +
     coord_sf(crs = "ESRI:102003") +
     theme_bw() +
     theme(
@@ -306,11 +305,10 @@ hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, st
     counties_sf, 
     outage, 
     by = join_by(GEOID == geoid)
-  ) %>%
-    mutate(quantile_avg_customer_hrs_out = classInt::classify_intervals(round(avg_customer_hrs_out, 3), n = 5, style = "quantile"))
+  )
   
   ggplot(out_sf) +
-    geom_sf(aes(fill = quantile_avg_customer_hrs_out), color = NA) +
+    geom_sf(aes(fill = avg_customer_hrs_out), color = NA) +
     geom_sf(data = states_sf, fill = NA) +
     geom_sf(
       data = st_intersection(
@@ -318,7 +316,7 @@ hur_info$out_plots <- pmap(hur_info, function(hurricane, counties_sf, outage, st
         st_as_sfc(st_bbox(states_sf))
       )
     ) +
-    scale_fill_brewer(palette = "Reds", na.value= "grey") +
+    scale_fill_distiller(palette = "Reds", na.value= "grey", direction = 1) +
     coord_sf(crs = "ESRI:102003") +
     theme_bw() +
     theme(

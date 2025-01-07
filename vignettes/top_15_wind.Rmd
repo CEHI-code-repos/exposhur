@@ -270,11 +270,10 @@ hur_info$wind_plots <- pmap(hur_info, function(hurricane, tracts_sf, tract_ander
     tract_anderson_wind, 
     by = join_by(GEOID == geoid)
   ) %>%
-    mutate(vmax_sust = vmax_sust * 3.6) %>%
-    mutate(quantile_vmax_sust = classify_intervals(round(vmax_sust, 3), n = 5, style = "quantile"))
+    mutate(vmax_sust = vmax_sust * 3.6)
   
   ggplot(wind_sf) +
-    geom_sf(aes(fill = quantile_vmax_sust), color = NA) +
+    geom_sf(aes(fill = vmax_sust), color = NA) +
     geom_sf(data = states_sf, fill = NA) +
     geom_sf(
       data = st_intersection(
@@ -282,7 +281,7 @@ hur_info$wind_plots <- pmap(hur_info, function(hurricane, tracts_sf, tract_ander
         st_as_sfc(st_bbox(states_sf))
       )
     ) +
-    scale_fill_brewer(palette = "Greens") +
+    scale_fill_distiller(palette = "Greens", na.value= "grey", direction = 1) +
     coord_sf(crs = "ESRI:102003") +
     theme_bw() +
     theme(
@@ -344,11 +343,10 @@ hur_info$dist_plots <- pmap(hur_info, function(hurricane, tracts_sf, tract_ander
     tracts_sf, 
     tract_anderson_wind, 
     by = join_by(GEOID == geoid)
-  ) %>%
-    mutate(quantile_closest_dist = classify_intervals(round(closest_dist, 3), n = 5, style = "quantile"))
+  )
   
   ggplot(dist_sf) +
-    geom_sf(aes(fill = quantile_closest_dist), color = NA) +
+    geom_sf(aes(fill = closest_dist), color = NA) +
     geom_sf(data = states_sf, fill = NA) +
     geom_sf(
       data = st_intersection(
@@ -356,7 +354,7 @@ hur_info$dist_plots <- pmap(hur_info, function(hurricane, tracts_sf, tract_ander
         st_as_sfc(st_bbox(states_sf))
       )
     ) +
-    scale_fill_brewer(palette = "Purples", direction=-1) +
+    scale_fill_distiller(palette = "Purples", na.value= "grey", direction = -1) +
     coord_sf(crs = "ESRI:102003") +
     theme_bw() +
     theme(
