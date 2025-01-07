@@ -43,7 +43,7 @@ download_eia_customers <- function(year) {
       values_to = "customers"
     ) |>
     dplyr::mutate(state = stringr::str_remove(.data$state, "US-")) |>
-    dplyr::filter(stringr::str_sub(.data$year, 1, 4) == year) |>
+    dplyr::filter(stringr::str_sub(.data$year, 1, 4) == .env$year) |>
     dplyr::left_join(state_fips, "state")
 }
 
