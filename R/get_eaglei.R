@@ -68,7 +68,7 @@ calc_customer_est <- function(year, path) {
       dplyr::filter(stringr::str_sub(.data$GEOID, 3, 5) != "999") |>
       dplyr::mutate("state_code" = stringr::str_sub(.data$GEOID, 1, 2)) |>
       dplyr::group_by(.data$state_code) |>
-      dplyr::mutate("customer_pct" = .data$hld_est / sum(.data$hld_est)) |>
+      dplyr::mutate("customer_pct" = .data$hld_est / sum(.data$hld_est, na.rm = TRUE)) |>
       dplyr::ungroup()
 
     eia_customers <- download_eia_customers(year)
@@ -138,7 +138,7 @@ get_eaglei <- function(interval, path = NULL) {
 
   year <- lubridate::year(lubridate::int_start(interval))
 
-  customer_est <- calc_customer_est(year, path)
+  customer_est <- exposur:::calc_customer_est(year, path)
 
   readr::read_csv(unz(
     eaglei_path,
