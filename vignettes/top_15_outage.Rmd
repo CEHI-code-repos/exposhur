@@ -92,7 +92,7 @@ library(sf)
 The following hurricanes were selected.
 
 ```{r, eval = FALSE}
-hur_info <- readRDS( "raw-data/RF1_Hurricanes.rds")
+hur_info <- readRDS( "raw-data/RF1_Hurricanes_Final.rds")
 # get fips codes for each state
 fips_codes <- distinct(tigris::fips_codes, state, state_code)
 hur_info$fips <- pmap(hur_info, function(states, ...) {
@@ -193,7 +193,7 @@ library(tigris)
 library(sf)
 
 # repeat from above
-hur_info <- readRDS( "../raw-data/RF1_Hurricanes.rds") %>%
+hur_info <- readRDS( "../raw-data/RF1_Hurricanes_Final.rds") %>%
   filter(year >= 2014)
 fips_codes <- distinct(tigris::fips_codes, state, state_code)
 hur_info$fips <- pmap(hur_info, function(states, ...) {
