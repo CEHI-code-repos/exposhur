@@ -10,7 +10,7 @@ vignette: >
 The following is a very cursory examination of the Outage data for Hurricanes Matthew and Florence
 
 ```{r, include = FALSE}
-library(exposur)
+library(exposhur)
 library(tigris)
 library(tidyverse)
 library(sf)

@@ -138,7 +138,7 @@ get_eaglei <- function(interval, path = NULL) {
 
   year <- lubridate::year(lubridate::int_start(interval))
 
-  customer_est <- exposur:::calc_customer_est(year, path)
+  customer_est <- exposhur:::calc_customer_est(year, path)
 
   readr::read_csv(unz(
     eaglei_path,

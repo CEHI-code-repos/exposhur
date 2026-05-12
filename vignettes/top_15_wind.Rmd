@@ -80,7 +80,7 @@ cat(start_time, "\n")
 ```
 
 ```{r setup, eval = FALSE}
-library(exposur)
+library(exposhur)
 library(tidyverse)
 library(tigris)
 library(sf)
@@ -100,7 +100,7 @@ hur_info$fips <- pmap(hur_info, function(states, ...) {
 ## Get hurdat2 info for each storm
 
 ```{r, eval = FALSE}
-exposur:::download_newest_hurdat2(path = "raw-data/hurdat2")
+exposhur:::download_newest_hurdat2(path = "raw-data/hurdat2")
 
 hur_info$hurdat2 <- pmap(hur_info, function(hurricane, ...){
   hurdat  <- get_hurdat2(

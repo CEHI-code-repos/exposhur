@@ -13,7 +13,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# exposur
+# exposhur
 
 <!-- badges: start -->
 <!-- badges: end -->
@@ -22,11 +22,11 @@ Heavily inspired by [`hurricaneexposure`](https://cran.r-project.org/web/package
 
 ## Installation
 
-You can install the development version of `exposur` like so:
+You can install the development version of `exposhur` like so:
 
 ```{r, eval = FALSE}
 # first download the stormwindmodel
 pak::pkg_install("geanders/stormwindmodel")
 # then install this package
-pak::pkg_install("ryanzomorrodi/exposur")
+pak::pkg_install("ryanzomorrodi/exposhur")
 ```
